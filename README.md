@@ -52,19 +52,21 @@ npx svgforce
 ## Quick start
 
 ```bash
-# 1. Authenticate (choose one)
-svgforce login                        # interactive email + password
+# 1. Authenticate
+svgforce login
+
+# 2. Set up your project
+svgforce init
+
+# 3. Generate components
+npm run icons
+```
+
+Or manually:
+
+```bash
 svgforce login --api-key sf_live_...  # API key (recommended for CI/CD)
-
-# 2. Generate components
-# React
 svgforce react icons/ -o src/components/icons/
-
-# React Native
-svgforce react-native icons/ -o src/mobile/icons/
-
-# Angular
-svgforce angular icons/ -o src/app/icons/
 ```
 
 ## Authentication
@@ -99,6 +101,47 @@ svgforce react icons/ -o src/components/
 ```bash
 svgforce logout   # remove stored credentials
 svgforce whoami   # show user, plan, and usage
+```
+
+## Project setup
+
+### `svgforce init`
+
+Interactive wizard that configures SvgForce for your project:
+
+```bash
+svgforce init
+```
+
+The wizard will ask you:
+
+1. **Which framework?** — React, React Native, Angular, or Optimize only
+2. **Where are your SVG files?** — e.g. `./icons`
+3. **Where to save generated files?** — e.g. `./src/components/icons`
+4. **Component name** — e.g. `Icon`
+5. **Create `svgforce.config.json`?** — project config for default settings
+6. **Add npm scripts?** — adds `icons` / `icons:optimize` scripts to `package.json`
+
+Example generated config (`svgforce.config.json`):
+
+```json
+{
+  "framework": "react",
+  "input": "./icons",
+  "output": "./src/components/icons",
+  "componentName": "Icon"
+}
+```
+
+Example npm scripts added to `package.json`:
+
+```json
+{
+  "scripts": {
+    "icons": "svgforce react ./icons -o ./src/components/icons -n Icon",
+    "icons:optimize": "svgforce optimize ./icons -o ./icons"
+  }
+}
 ```
 
 ## Commands
@@ -192,7 +235,18 @@ Only `.svg` files are processed; everything else is silently skipped.
 
 ## Configuration
 
-Credentials are stored in `~/.config/svgforce/config.json`. You can inspect the path with:
+**Project config** — `svgforce.config.json` in your project root (created by `svgforce init`):
+
+```json
+{
+  "framework": "react",
+  "input": "./icons",
+  "output": "./src/components/icons",
+  "componentName": "Icon"
+}
+```
+
+**User credentials** — stored in `~/.config/svgforce/config.json`. Verify with:
 
 ```bash
 svgforce whoami

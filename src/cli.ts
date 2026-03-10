@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { initCommand } from './commands/init.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
 import { whoamiCommand } from './commands/whoami.js';
@@ -17,6 +18,19 @@ export function createCli(): Command {
     .name('svgforce')
     .description('SvgForce CLI — optimize SVGs and generate icon components')
     .version('1.0.0');
+
+  // ── Setup ───────────────────────────────────────────
+
+  program
+    .command('init')
+    .description('Initialize SvgForce in your project (interactive setup)')
+    .action(async () => {
+      try {
+        await initCommand();
+      } catch (err) {
+        handleError(err);
+      }
+    });
 
   // ── Auth ─────────────────────────────────────────────
 

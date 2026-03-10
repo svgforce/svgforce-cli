@@ -3,10 +3,287 @@
 // src/cli.ts
 import { Command } from "commander";
 
-// src/commands/login.ts
+// src/commands/init.ts
+import fs2 from "fs";
+import path2 from "path";
+import chalk3 from "chalk";
+
+// src/lib/logger.ts
+import chalk from "chalk";
+var log = {
+  info: (msg) => console.log(chalk.blue("\u2139"), msg),
+  success: (msg) => console.log(chalk.green("\u2713"), msg),
+  warn: (msg) => console.log(chalk.yellow("\u26A0"), msg),
+  error: (msg) => console.error(chalk.red("\u2717"), msg),
+  dim: (msg) => console.log(chalk.dim(msg)),
+  blank: () => console.log()
+};
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// src/lib/prompt.ts
 import { createInterface } from "readline/promises";
 import { stdin, stdout } from "process";
-import chalk3 from "chalk";
+import chalk2 from "chalk";
+var _rl = null;
+function rl() {
+  if (!_rl) _rl = createInterface({ input: stdin, output: stdout });
+  return _rl;
+}
+function closePrompt() {
+  _rl?.close();
+  _rl = null;
+}
+async function ask(question, defaultValue) {
+  const hint = defaultValue ? chalk2.dim(` (${defaultValue})`) : "";
+  const answer = await rl().question(`${question}${hint}: `);
+  return answer.trim() || defaultValue || "";
+}
+async function confirm(question, defaultYes = true) {
+  const hint = defaultYes ? chalk2.dim(" (Y/n)") : chalk2.dim(" (y/N)");
+  const answer = await rl().question(`${question}${hint}: `);
+  const normalized = answer.trim().toLowerCase();
+  if (!normalized) return defaultYes;
+  return normalized === "y" || normalized === "yes";
+}
+async function select(question, options, defaultIndex = 0) {
+  console.log();
+  console.log(chalk2.bold(question));
+  for (let i = 0; i < options.length; i++) {
+    const marker = i === defaultIndex ? chalk2.cyan("\u25B8") : " ";
+    const num = chalk2.dim(`${i + 1}.`);
+    const label = i === defaultIndex ? chalk2.cyan(options[i].label) : options[i].label;
+    console.log(`  ${marker} ${num} ${label}`);
+  }
+  const answer = await rl().question(
+    chalk2.dim(`  Enter choice [1-${options.length}] (default ${defaultIndex + 1}): `)
+  );
+  const idx = answer.trim() ? parseInt(answer.trim(), 10) - 1 : defaultIndex;
+  if (idx >= 0 && idx < options.length) {
+    return options[idx].value;
+  }
+  return options[defaultIndex].value;
+}
+
+// src/lib/projectConfig.ts
+import fs from "fs";
+import path from "path";
+var CONFIG_FILENAME = "svgforce.config.json";
+function writeProjectConfig(config2, cwd = process.cwd()) {
+  const configPath = path.join(cwd, CONFIG_FILENAME);
+  fs.writeFileSync(configPath, JSON.stringify(config2, null, 2) + "\n", "utf-8");
+  return configPath;
+}
+function getConfigFilename() {
+  return CONFIG_FILENAME;
+}
+
+// src/commands/init.ts
+var FRAMEWORK_OPTIONS = [
+  { value: "react", label: "React (.tsx)" },
+  { value: "react-native", label: "React Native (.tsx)" },
+  { value: "angular", label: "Angular (.component.ts)" },
+  { value: "optimize", label: "Optimize only (.svg)" }
+];
+var DEFAULT_INPUTS = {
+  react: "./icons",
+  "react-native": "./icons",
+  angular: "./icons",
+  optimize: "./icons"
+};
+var DEFAULT_OUTPUTS = {
+  react: "./src/components/icons",
+  "react-native": "./src/icons",
+  angular: "./src/app/icons",
+  optimize: "./icons/optimized"
+};
+var DEFAULT_NAMES = {
+  react: "Icon",
+  "react-native": "Icon",
+  angular: "Icon",
+  optimize: ""
+};
+function buildNpmScripts(cfg) {
+  const scripts = {};
+  if (cfg.framework === "optimize") {
+    scripts["icons"] = `svgforce optimize ${cfg.input} -o ${cfg.output}`;
+  } else {
+    const nameFlag = cfg.componentName ? ` -n ${cfg.componentName}` : "";
+    const selectorFlag = cfg.framework === "angular" && cfg.selector ? ` -s ${cfg.selector}` : "";
+    scripts["icons"] = `svgforce ${cfg.framework} ${cfg.input} -o ${cfg.output}${nameFlag}${selectorFlag}`;
+    scripts["icons:optimize"] = `svgforce optimize ${cfg.input} -o ${cfg.input}`;
+  }
+  return scripts;
+}
+function printBanner() {
+  console.log();
+  console.log(chalk3.bold.cyan("  \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557"));
+  console.log(chalk3.bold.cyan("  \u2551") + chalk3.bold("       SvgForce \u2014 Project Setup        ") + chalk3.bold.cyan("\u2551"));
+  console.log(chalk3.bold.cyan("  \u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D"));
+  console.log();
+  console.log(
+    chalk3.dim("  This wizard will configure SvgForce for your project.")
+  );
+  console.log(
+    chalk3.dim("  It creates a config file and optional npm scripts.")
+  );
+  console.log();
+}
+async function initCommand() {
+  printBanner();
+  const configFile = getConfigFilename();
+  const existingConfig = path2.join(process.cwd(), configFile);
+  if (fs2.existsSync(existingConfig)) {
+    log.warn(`${chalk3.bold(configFile)} already exists in this directory.`);
+    const overwrite = await confirm("  Overwrite it?", false);
+    if (!overwrite) {
+      log.info("Aborted. Existing config is unchanged.");
+      closePrompt();
+      return;
+    }
+    console.log();
+  }
+  const framework = await select(
+    "  Which framework do you use?",
+    FRAMEWORK_OPTIONS,
+    0
+  );
+  console.log();
+  const input = await ask(
+    `  ${chalk3.bold("Where are your SVG files?")}`,
+    DEFAULT_INPUTS[framework]
+  );
+  const output = await ask(
+    `  ${chalk3.bold("Where to save generated files?")}`,
+    DEFAULT_OUTPUTS[framework]
+  );
+  let componentName;
+  let selector;
+  if (framework !== "optimize") {
+    componentName = await ask(
+      `  ${chalk3.bold("Component name")}`,
+      DEFAULT_NAMES[framework]
+    );
+    if (framework === "angular") {
+      const defaultSelector = `app-${(componentName || "icon").toLowerCase()}`;
+      selector = await ask(
+        `  ${chalk3.bold("Angular selector")}`,
+        defaultSelector
+      );
+    }
+  }
+  console.log();
+  const createConfig = await confirm(
+    `  ${chalk3.bold(`Create ${chalk3.cyan(configFile)}?`)}`,
+    true
+  );
+  const projectConfig = {
+    framework,
+    input,
+    output,
+    ...componentName && { componentName },
+    ...selector && { selector }
+  };
+  let configCreated = false;
+  if (createConfig) {
+    writeProjectConfig(projectConfig);
+    configCreated = true;
+  }
+  let scriptsAdded = false;
+  const pkgPath = path2.join(process.cwd(), "package.json");
+  const hasPkg = fs2.existsSync(pkgPath);
+  if (hasPkg) {
+    console.log();
+    const addScripts = await confirm(
+      `  ${chalk3.bold("Add npm scripts to package.json?")}`,
+      true
+    );
+    if (addScripts) {
+      const scripts = buildNpmScripts(projectConfig);
+      try {
+        const pkgRaw = fs2.readFileSync(pkgPath, "utf-8");
+        const pkg = JSON.parse(pkgRaw);
+        pkg.scripts = { ...pkg.scripts, ...scripts };
+        fs2.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
+        scriptsAdded = true;
+      } catch {
+        log.error("Failed to update package.json");
+      }
+    }
+  }
+  const resolvedInput = path2.resolve(input);
+  if (!fs2.existsSync(resolvedInput)) {
+    console.log();
+    const createDir = await confirm(
+      `  ${chalk3.bold(`Create ${chalk3.cyan(input)} directory?`)}`,
+      true
+    );
+    if (createDir) {
+      fs2.mkdirSync(resolvedInput, { recursive: true });
+    }
+  }
+  closePrompt();
+  console.log();
+  console.log(chalk3.bold.green("  \u2713 Project initialized!"));
+  console.log();
+  if (configCreated) {
+    log.success(`Created ${chalk3.cyan(configFile)}`);
+  }
+  if (scriptsAdded) {
+    log.success(`Added npm scripts to ${chalk3.cyan("package.json")}`);
+  }
+  if (!fs2.existsSync(resolvedInput)) {
+  } else {
+    log.success(`Input directory: ${chalk3.cyan(input)}`);
+  }
+  console.log();
+  console.log(chalk3.bold("  Next steps:"));
+  console.log();
+  const steps = [];
+  if (!fs2.existsSync(path2.resolve(input, "*.svg"))) {
+    steps.push(`Drop your SVG files into ${chalk3.cyan(input)}`);
+  }
+  if (scriptsAdded) {
+    if (framework === "optimize") {
+      steps.push(`Run ${chalk3.cyan("npm run icons")} to optimize`);
+    } else {
+      steps.push(`Run ${chalk3.cyan("npm run icons")} to generate components`);
+      steps.push(`Run ${chalk3.cyan("npm run icons:optimize")} to optimize SVGs in-place`);
+    }
+  } else {
+    const scripts = buildNpmScripts(projectConfig);
+    const mainCmd = Object.values(scripts)[0];
+    steps.push(`Run ${chalk3.cyan(mainCmd)}`);
+  }
+  for (let i = 0; i < steps.length; i++) {
+    console.log(`  ${chalk3.dim(`${i + 1}.`)} ${steps[i]}`);
+  }
+  console.log();
+  console.log(chalk3.bold("  CI/CD example (GitHub Actions):"));
+  console.log();
+  console.log(chalk3.dim("  - name: Generate icons"));
+  console.log(chalk3.dim("    env:"));
+  console.log(chalk3.dim("      SVGFORCE_API_KEY: ${{ secrets.SVGFORCE_API_KEY }}"));
+  if (framework === "optimize") {
+    console.log(chalk3.dim(`    run: npx svgforce optimize ${input} -o ${output}`));
+  } else {
+    const nameFlag = componentName ? ` -n ${componentName}` : "";
+    console.log(chalk3.dim(`    run: npx svgforce ${framework} ${input} -o ${output}${nameFlag}`));
+  }
+  console.log();
+  console.log(
+    chalk3.dim("  Docs: ") + chalk3.underline("https://svgforce.dev/documentation")
+  );
+  console.log();
+}
+
+// src/commands/login.ts
+import { createInterface as createInterface2 } from "readline/promises";
+import { stdin as stdin2, stdout as stdout2 } from "process";
+import chalk5 from "chalk";
 import ora from "ora";
 
 // src/lib/config.ts
@@ -54,24 +331,8 @@ function clearCredentials() {
   config.delete("userEmail");
 }
 
-// src/lib/logger.ts
-import chalk from "chalk";
-var log = {
-  info: (msg) => console.log(chalk.blue("\u2139"), msg),
-  success: (msg) => console.log(chalk.green("\u2713"), msg),
-  warn: (msg) => console.log(chalk.yellow("\u26A0"), msg),
-  error: (msg) => console.error(chalk.red("\u2717"), msg),
-  dim: (msg) => console.log(chalk.dim(msg)),
-  blank: () => console.log()
-};
-function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 // src/lib/errors.ts
-import chalk2 from "chalk";
+import chalk4 from "chalk";
 var CliError = class extends Error {
   constructor(message, hint) {
     super(message);
@@ -96,20 +357,20 @@ var PlanError = class extends CliError {
 };
 function handleError(err) {
   if (err instanceof CliError) {
-    console.error(chalk2.red(`Error: ${err.message}`));
+    console.error(chalk4.red(`Error: ${err.message}`));
     if (err.hint) {
-      console.error(chalk2.dim(`  Hint: ${err.hint}`));
+      console.error(chalk4.dim(`  Hint: ${err.hint}`));
     }
     process.exit(1);
   }
   if (err instanceof Error) {
-    console.error(chalk2.red(`Unexpected error: ${err.message}`));
+    console.error(chalk4.red(`Unexpected error: ${err.message}`));
     if (process.env.DEBUG) {
       console.error(err.stack);
     }
     process.exit(1);
   }
-  console.error(chalk2.red("An unknown error occurred"));
+  console.error(chalk4.red("An unknown error occurred"));
   process.exit(1);
 }
 
@@ -142,7 +403,7 @@ async function loginWithApiKey(key) {
     }
     const data = await res.json();
     storeApiKey(key);
-    spinner.succeed(`Authenticated as ${chalk3.bold(data.email ?? data.name ?? "user")}`);
+    spinner.succeed(`Authenticated as ${chalk5.bold(data.email ?? data.name ?? "user")}`);
   } catch (err) {
     if (err instanceof CliError) {
       spinner.fail(err.message);
@@ -153,38 +414,38 @@ async function loginWithApiKey(key) {
   }
 }
 async function loginInteractive() {
-  log.info(`Log in to ${chalk3.bold("SvgForce")} with your email and password.`);
+  log.info(`Log in to ${chalk5.bold("SvgForce")} with your email and password.`);
   log.dim("Your credentials are sent directly to the API and are never stored locally.");
   log.blank();
-  const rl = createInterface({ input: stdin, output: stdout });
+  const rl2 = createInterface2({ input: stdin2, output: stdout2 });
   try {
-    const email = await rl.question(chalk3.cyan("  Email: "));
+    const email = await rl2.question(chalk5.cyan("  Email: "));
     if (!email.includes("@")) {
       throw new CliError("Invalid email address.");
     }
     const password = await new Promise((resolve) => {
-      stdout.write(chalk3.cyan("  Password: "));
-      const originalRawMode = stdin.isRaw;
-      if (stdin.isTTY) stdin.setRawMode(true);
+      stdout2.write(chalk5.cyan("  Password: "));
+      const originalRawMode = stdin2.isRaw;
+      if (stdin2.isTTY) stdin2.setRawMode(true);
       let buf = "";
       const onData = (ch) => {
         const c = ch.toString();
         if (c === "\n" || c === "\r") {
-          if (stdin.isTTY) stdin.setRawMode(originalRawMode ?? false);
-          stdin.removeListener("data", onData);
-          stdout.write("\n");
+          if (stdin2.isTTY) stdin2.setRawMode(originalRawMode ?? false);
+          stdin2.removeListener("data", onData);
+          stdout2.write("\n");
           resolve(buf);
         } else if (c === "\x7F" || c === "\b") {
           buf = buf.slice(0, -1);
         } else if (c === "") {
-          if (stdin.isTTY) stdin.setRawMode(originalRawMode ?? false);
-          stdin.removeListener("data", onData);
+          if (stdin2.isTTY) stdin2.setRawMode(originalRawMode ?? false);
+          stdin2.removeListener("data", onData);
           process.exit(130);
         } else {
           buf += c;
         }
       };
-      stdin.on("data", onData);
+      stdin2.on("data", onData);
     });
     if (!password) {
       throw new CliError("Password cannot be empty.");
@@ -216,9 +477,9 @@ async function loginInteractive() {
       throw new CliError("Server did not return an authentication token.");
     }
     storeJwt(data.token, email);
-    spinner.succeed(`Logged in as ${chalk3.bold(data.user?.email ?? email)}`);
+    spinner.succeed(`Logged in as ${chalk5.bold(data.user?.email ?? email)}`);
   } finally {
-    rl.close();
+    rl2.close();
   }
 }
 
@@ -229,15 +490,15 @@ async function logoutCommand() {
 }
 
 // src/commands/whoami.ts
-import chalk4 from "chalk";
+import chalk6 from "chalk";
 import ora2 from "ora";
 
 // src/lib/api.ts
-async function apiRequest(path6, opts = {}) {
+async function apiRequest(path8, opts = {}) {
   const cred = getAuthCredential();
   if (!cred) throw new AuthError();
   const baseUrl = getApiUrl().replace(/\/+$/, "");
-  const url = `${baseUrl}/api${path6}`;
+  const url = `${baseUrl}/api${path8}`;
   const headers = {
     "User-Agent": "svgforce-cli/1.0.0",
     ...opts.headers
@@ -277,11 +538,11 @@ async function apiRequest(path6, opts = {}) {
   }
   return res.json();
 }
-async function apiRequestBinary(path6, opts = {}) {
+async function apiRequestBinary(path8, opts = {}) {
   const cred = getAuthCredential();
   if (!cred) throw new AuthError();
   const baseUrl = getApiUrl().replace(/\/+$/, "");
-  const url = `${baseUrl}/api${path6}`;
+  const url = `${baseUrl}/api${path8}`;
   const headers = {
     "Content-Type": "application/json",
     "User-Agent": "svgforce-cli/1.0.0",
@@ -346,30 +607,30 @@ async function whoamiCommand() {
   const plan = profile.subscription.plan.toUpperCase();
   const used = profile.subscription.iconsTotal - profile.subscription.iconsRemaining;
   log.blank();
-  console.log(`  ${chalk4.dim("User:")}     ${chalk4.bold(profile.name)} ${chalk4.dim(`<${profile.email}>`)}`);
-  console.log(`  ${chalk4.dim("Plan:")}     ${chalk4.bold(plan)}`);
-  console.log(`  ${chalk4.dim("Usage:")}    ${used}/${profile.subscription.iconsTotal} icons this month`);
+  console.log(`  ${chalk6.dim("User:")}     ${chalk6.bold(profile.name)} ${chalk6.dim(`<${profile.email}>`)}`);
+  console.log(`  ${chalk6.dim("Plan:")}     ${chalk6.bold(plan)}`);
+  console.log(`  ${chalk6.dim("Usage:")}    ${used}/${profile.subscription.iconsTotal} icons this month`);
   if (profile.subscription.teamName) {
-    console.log(`  ${chalk4.dim("Team:")}     ${profile.subscription.teamName}${profile.subscription.teamRole ? ` (${profile.subscription.teamRole})` : ""}`);
+    console.log(`  ${chalk6.dim("Team:")}     ${profile.subscription.teamName}${profile.subscription.teamRole ? ` (${profile.subscription.teamRole})` : ""}`);
   }
-  console.log(`  ${chalk4.dim("Auth:")}     ${cred.type === "api_key" ? "API Key" : "JWT Token"}`);
+  console.log(`  ${chalk6.dim("Auth:")}     ${cred.type === "api_key" ? "API Key" : "JWT Token"}`);
   log.blank();
 }
 
 // src/commands/optimize.ts
-import path2 from "path";
-import chalk5 from "chalk";
+import path4 from "path";
+import chalk7 from "chalk";
 import ora3 from "ora";
 
 // src/lib/files.ts
-import fs from "fs";
-import path from "path";
+import fs3 from "fs";
+import path3 from "path";
 import { glob } from "glob";
 async function resolveSvgFiles(patterns) {
   const files = [];
   const seen = /* @__PURE__ */ new Set();
   for (const pattern of patterns) {
-    const stat = fs.existsSync(pattern) ? fs.statSync(pattern) : null;
+    const stat = fs3.existsSync(pattern) ? fs3.statSync(pattern) : null;
     if (stat?.isDirectory()) {
       const matches = await glob("**/*.svg", { cwd: pattern, absolute: true });
       for (const match of matches) {
@@ -397,8 +658,8 @@ async function resolveSvgFiles(patterns) {
   return files;
 }
 function readSvgFile(filePath) {
-  const svg = fs.readFileSync(filePath, "utf-8");
-  const baseName = path.basename(filePath, ".svg");
+  const svg = fs3.readFileSync(filePath, "utf-8");
+  const baseName = path3.basename(filePath, ".svg");
   const name = toPascalCase(baseName);
   return { name, svg, absolutePath: filePath };
 }
@@ -406,21 +667,21 @@ function toPascalCase(str) {
   return str.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
 }
 function ensureOutputDir(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (!fs3.existsSync(dir)) {
+    fs3.mkdirSync(dir, { recursive: true });
   }
 }
 function writeOutput(filePath, content) {
-  const dir = path.dirname(filePath);
+  const dir = path3.dirname(filePath);
   ensureOutputDir(dir);
-  fs.writeFileSync(filePath, content);
+  fs3.writeFileSync(filePath, content);
 }
 
 // src/commands/optimize.ts
 async function optimizeCommand(patterns, opts) {
   const files = await resolveSvgFiles(patterns);
   if (opts.dryRun) {
-    log.info(`Would optimize ${chalk5.bold(files.length)} SVG file(s):`);
+    log.info(`Would optimize ${chalk7.bold(files.length)} SVG file(s):`);
     for (const f of files) {
       log.dim(`  ${f.absolutePath}`);
     }
@@ -438,7 +699,7 @@ async function optimizeCommand(patterns, opts) {
   const totalIcons = headers.get("x-optimization-total");
   const outputDir = opts.output;
   ensureOutputDir(outputDir);
-  const outputPath = path2.join(outputDir, filename);
+  const outputPath = path4.join(outputDir, filename);
   writeOutput(outputPath, buffer);
   if (opts.json) {
     console.log(JSON.stringify({
@@ -450,21 +711,21 @@ async function optimizeCommand(patterns, opts) {
     }));
     return;
   }
-  log.success(`Optimized ${chalk5.bold(totalIcons ?? files.length)} icon(s)`);
+  log.success(`Optimized ${chalk7.bold(totalIcons ?? files.length)} icon(s)`);
   if (savedBytes && savedPercent) {
-    log.info(`Saved ${chalk5.bold(formatBytes(Number(savedBytes)))} (${savedPercent}%)`);
+    log.info(`Saved ${chalk7.bold(formatBytes(Number(savedBytes)))} (${savedPercent}%)`);
   }
-  log.info(`Output: ${chalk5.underline(outputPath)}`);
+  log.info(`Output: ${chalk7.underline(outputPath)}`);
 }
 
 // src/commands/react.ts
-import path3 from "path";
-import chalk6 from "chalk";
+import path5 from "path";
+import chalk8 from "chalk";
 import ora4 from "ora";
 async function reactCommand(patterns, opts) {
   const files = await resolveSvgFiles(patterns);
   if (opts.dryRun) {
-    log.info(`Would generate React component from ${chalk6.bold(files.length)} SVG file(s):`);
+    log.info(`Would generate React component from ${chalk8.bold(files.length)} SVG file(s):`);
     for (const f of files) {
       log.dim(`  ${f.name} <- ${f.absolutePath}`);
     }
@@ -482,7 +743,7 @@ async function reactCommand(patterns, opts) {
     }
   });
   spinner.stop();
-  const outputFile = path3.join(opts.output, `${opts.name}.tsx`);
+  const outputFile = path5.join(opts.output, `${opts.name}.tsx`);
   writeOutput(outputFile, result.code);
   if (opts.json) {
     console.log(JSON.stringify({
@@ -493,20 +754,20 @@ async function reactCommand(patterns, opts) {
     }));
     return;
   }
-  log.success(`Generated ${chalk6.bold(result.meta.generated)} icon(s) -> ${chalk6.underline(outputFile)}`);
+  log.success(`Generated ${chalk8.bold(result.meta.generated)} icon(s) -> ${chalk8.underline(outputFile)}`);
   if (result.meta.billed > 0) {
     log.dim(`  Billed: ${result.meta.billed} | Remaining: ${result.usage.remaining}/${result.usage.limit}`);
   }
 }
 
 // src/commands/reactNative.ts
-import path4 from "path";
-import chalk7 from "chalk";
+import path6 from "path";
+import chalk9 from "chalk";
 import ora5 from "ora";
 async function reactNativeCommand(patterns, opts) {
   const files = await resolveSvgFiles(patterns);
   if (opts.dryRun) {
-    log.info(`Would generate React Native component from ${chalk7.bold(files.length)} SVG file(s):`);
+    log.info(`Would generate React Native component from ${chalk9.bold(files.length)} SVG file(s):`);
     for (const f of files) {
       log.dim(`  ${f.name} <- ${f.absolutePath}`);
     }
@@ -524,7 +785,7 @@ async function reactNativeCommand(patterns, opts) {
     }
   });
   spinner.stop();
-  const outputFile = path4.join(opts.output, `${opts.name}.tsx`);
+  const outputFile = path6.join(opts.output, `${opts.name}.tsx`);
   writeOutput(outputFile, result.code);
   if (opts.json) {
     console.log(JSON.stringify({
@@ -535,20 +796,20 @@ async function reactNativeCommand(patterns, opts) {
     }));
     return;
   }
-  log.success(`Generated ${chalk7.bold(result.meta.generated)} icon(s) -> ${chalk7.underline(outputFile)}`);
+  log.success(`Generated ${chalk9.bold(result.meta.generated)} icon(s) -> ${chalk9.underline(outputFile)}`);
   if (result.meta.billed > 0) {
     log.dim(`  Billed: ${result.meta.billed} | Remaining: ${result.usage.remaining}/${result.usage.limit}`);
   }
 }
 
 // src/commands/angular.ts
-import path5 from "path";
-import chalk8 from "chalk";
+import path7 from "path";
+import chalk10 from "chalk";
 import ora6 from "ora";
 async function angularCommand(patterns, opts) {
   const files = await resolveSvgFiles(patterns);
   if (opts.dryRun) {
-    log.info(`Would generate Angular component from ${chalk8.bold(files.length)} SVG file(s):`);
+    log.info(`Would generate Angular component from ${chalk10.bold(files.length)} SVG file(s):`);
     for (const f of files) {
       log.dim(`  ${f.name} <- ${f.absolutePath}`);
     }
@@ -567,7 +828,7 @@ async function angularCommand(patterns, opts) {
     }
   });
   spinner.stop();
-  const outputFile = path5.join(opts.output, `${opts.name.toLowerCase()}.component.ts`);
+  const outputFile = path7.join(opts.output, `${opts.name.toLowerCase()}.component.ts`);
   writeOutput(outputFile, result.code);
   if (opts.json) {
     console.log(JSON.stringify({
@@ -578,7 +839,7 @@ async function angularCommand(patterns, opts) {
     }));
     return;
   }
-  log.success(`Generated ${chalk8.bold(result.meta.generated)} icon(s) -> ${chalk8.underline(outputFile)}`);
+  log.success(`Generated ${chalk10.bold(result.meta.generated)} icon(s) -> ${chalk10.underline(outputFile)}`);
   if (result.meta.billed > 0) {
     log.dim(`  Billed: ${result.meta.billed} | Remaining: ${result.usage.remaining}/${result.usage.limit}`);
   }
@@ -589,6 +850,13 @@ var DEFAULT_OUTPUT = "./svgforce-output";
 function createCli() {
   const program2 = new Command();
   program2.name("svgforce").description("SvgForce CLI \u2014 optimize SVGs and generate icon components").version("1.0.0");
+  program2.command("init").description("Initialize SvgForce in your project (interactive setup)").action(async () => {
+    try {
+      await initCommand();
+    } catch (err) {
+      handleError(err);
+    }
+  });
   program2.command("login").description("Authenticate with SvgForce (interactive or API key)").option("--api-key <key>", "Use an API key instead of email/password").action(async (opts) => {
     try {
       await loginCommand({ apiKey: opts.apiKey });

@@ -1,6 +1,6 @@
 {
   "name": "svgforce",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "SvgForce CLI — optimize SVGs and generate React/RN/Angular components from the terminal",
   "homepage": "https://svgforce.dev",
   "repository": {
