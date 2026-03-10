@@ -1,0 +1,53 @@
+{
+  "name": "svgforce",
+  "version": "1.0.0",
+  "description": "SvgForce CLI — optimize SVGs and generate React/RN/Angular components from the terminal",
+  "homepage": "https://svgforce.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/svgforce/svgforce.git"
+  },
+  "type": "module",
+  "bin": {
+    "svgforce": "./dist/bin.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/bin.js"
+  },
+  "keywords": [
+    "svg",
+    "react",
+    "react-native",
+    "angular",
+    "icon",
+    "component",
+    "optimize",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^13.1.0",
+    "chalk": "^5.4.1",
+    "ora": "^8.2.0",
+    "glob": "^11.0.1",
+    "open": "^10.1.2",
+    "conf": "^13.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^20.17.16",
+    "tsup": "^8.4.0"
+  }
+}
