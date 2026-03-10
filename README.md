@@ -21,7 +21,7 @@ Optimize SVG files and generate production-ready icon components for:
 Directly from your terminal.
 
 > ⚠ CLI access is available on the **Team plan**.
-> See [pricing](https://svgforce.dev/en/subscription) for details.
+> See [pricing](https://svgforce.dev/subscription) for details.
 
 ## Why SvgForce CLI
 
