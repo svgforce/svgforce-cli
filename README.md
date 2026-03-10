@@ -1,8 +1,38 @@
 # svgforce
 
-Official CLI for [SvgForce](https://svgforce.dev) — optimize SVG files and generate production-ready icon components for React, React Native, and Angular right from your terminal.
+<p align="center">
+  <img src="https://svgforce.dev/favicon.svg" width="140">
+</p>
 
-> **Requires a Team plan.** CLI access is exclusively available to [Team](https://svgforce.dev/pricing) subscribers.
+![npm version](https://img.shields.io/npm/v/svgforce)
+![npm downloads](https://img.shields.io/npm/dm/svgforce)
+![node version](https://img.shields.io/node/v/svgforce)
+![license](https://img.shields.io/npm/l/svgforce)
+![npm bundle size](https://img.shields.io/bundlephobia/minzip/svgforce)
+
+Official CLI for [SvgForce](https://svgforce.dev).
+
+Optimize SVG files and generate production-ready icon components for:
+
+- React
+- React Native
+- Angular
+
+Directly from your terminal.
+
+> ⚠ CLI access is available on the **Team plan**.
+> See [pricing](https://svgforce.dev/en/subscription) for details.
+
+## Why SvgForce CLI
+
+SvgForce CLI lets you integrate SVG optimization and icon generation directly into your development workflow.
+
+Benefits:
+
+- ⚡ Batch process entire icon libraries
+- 🧼 Automatically clean SVG files from design tools
+- 📦 Generate ready-to-use framework components
+- 🤖 Perfect for CI/CD pipelines
 
 ## Install
 
@@ -10,10 +40,10 @@ Official CLI for [SvgForce](https://svgforce.dev) — optimize SVG files and gen
 npm install -g svgforce
 ```
 
-Or run without installing:
+Or run instantly without installing:
 
 ```bash
-npx svgforce --help
+npx svgforce
 ```
 
 **Requirements:** Node.js >= 20
@@ -26,7 +56,14 @@ svgforce login                        # interactive email + password
 svgforce login --api-key sf_live_...  # API key (recommended for CI/CD)
 
 # 2. Generate components
-svgforce react icons/*.svg -o src/components/
+# React
+svgforce react icons/ -o src/components/icons/
+
+# React Native
+svgforce react-native icons/ -o src/mobile/icons/
+
+# Angular
+svgforce angular icons/ -o src/app/icons/
 ```
 
 ## Authentication
@@ -104,18 +141,18 @@ svgforce angular icons/ -o src/app/icons/ -n AppIcon -s app-icon
 
 All conversion commands share these options:
 
-| Option | Description | Default |
-|---|---|---|
-| `-o, --output <dir>` | Output directory | `./svgforce-output/` |
-| `-n, --name <name>` | Component name | `Icon` |
-| `--opacity` | Add opacity prop support | `false` |
-| `--dry-run` | Preview without writing files | `false` |
-| `--json` | Output result as JSON (useful for scripting) | `false` |
+| Option               | Description                                  | Default              |
+| -------------------- | -------------------------------------------- | -------------------- |
+| `-o, --output <dir>` | Output directory                             | `./svgforce-output/` |
+| `-n, --name <name>`  | Component name                               | `Icon`               |
+| `--opacity`          | Add opacity prop support                     | `false`              |
+| `--dry-run`          | Preview without writing files                | `false`              |
+| `--json`             | Output result as JSON (useful for scripting) | `false`              |
 
 Angular additionally supports:
 
-| Option | Description |
-|---|---|
+| Option                 | Description                |
+| ---------------------- | -------------------------- |
 | `-s, --selector <sel>` | Angular component selector |
 
 ## Input formats
@@ -146,11 +183,11 @@ Only `.svg` files are processed; everything else is silently skipped.
 
 ## Environment variables
 
-| Variable | Description |
-|---|---|
+| Variable           | Description                                                         |
+| ------------------ | ------------------------------------------------------------------- |
 | `SVGFORCE_API_KEY` | API key for authentication (takes priority over stored credentials) |
-| `SVGFORCE_API_URL` | Override the API base URL (for development/testing) |
-| `DEBUG` | Set to any value to see stack traces on errors |
+| `SVGFORCE_API_URL` | Override the API base URL (for development/testing)                 |
+| `DEBUG`            | Set to any value to see stack traces on errors                      |
 
 ## Configuration
 
