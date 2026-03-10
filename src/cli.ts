@@ -36,11 +36,12 @@ export function createCli(): Command {
 
   program
     .command('login')
-    .description('Authenticate with SvgForce (interactive or API key)')
-    .option('--api-key <key>', 'Use an API key instead of email/password')
+    .description('Authenticate with SvgForce (opens browser by default)')
+    .option('--api-key <key>', 'Use an API key (for CI/CD)')
+    .option('--with-email', 'Use email + password instead of browser', false)
     .action(async (opts) => {
       try {
-        await loginCommand({ apiKey: opts.apiKey });
+        await loginCommand({ apiKey: opts.apiKey, withEmail: opts.withEmail });
       } catch (err) {
         handleError(err);
       }

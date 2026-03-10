@@ -71,15 +71,15 @@ svgforce react icons/ -o src/components/icons/
 
 ## Authentication
 
-### Interactive login
+### Browser login (default)
 
 ```bash
 svgforce login
 ```
 
-You will be prompted for email and password. A JWT token is stored locally in `~/.config/svgforce/`.
+Opens your browser where you can sign in with **Google**, **email + password**, or any other method you used to register. The CLI receives a token automatically — no need to copy anything.
 
-### API key
+### API key (for CI/CD)
 
 Generate an API key in your [profile](https://svgforce.dev/profile) (API Keys tab), then:
 
@@ -92,6 +92,14 @@ For CI/CD pipelines, set the environment variable instead:
 ```bash
 export SVGFORCE_API_KEY=sf_live_a1b2c3d4...
 svgforce react icons/ -o src/components/
+```
+
+### Email + password login
+
+If you prefer not to open a browser:
+
+```bash
+svgforce login --with-email
 ```
 
 **Priority:** `SVGFORCE_API_KEY` env > stored API key > stored JWT token.

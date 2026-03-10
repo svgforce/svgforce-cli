@@ -281,10 +281,12 @@ async function initCommand() {
 }
 
 // src/commands/login.ts
+import http from "http";
 import { createInterface as createInterface2 } from "readline/promises";
 import { stdin as stdin2, stdout as stdout2 } from "process";
 import chalk5 from "chalk";
 import ora from "ora";
+import open from "open";
 
 // src/lib/config.ts
 import Conf from "conf";
@@ -375,11 +377,140 @@ function handleError(err) {
 }
 
 // src/commands/login.ts
+var FRONTEND_URL = process.env.SVGFORCE_FRONTEND_URL ?? "https://svgforce.dev";
 async function loginCommand(opts) {
   if (opts.apiKey) {
     return loginWithApiKey(opts.apiKey);
   }
-  return loginInteractive();
+  if (opts.withEmail) {
+    return loginInteractive();
+  }
+  return loginWithBrowser();
+}
+var SUCCESS_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SvgForce CLI \u2014 Authenticated</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0a0e1a; color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .card {
+      text-align: center; padding: 48px; border-radius: 24px;
+      background: rgba(15, 20, 45, 0.8); border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+    }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    p { color: rgba(255,255,255,0.5); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">&#10003;</div>
+    <h1>Authenticated!</h1>
+    <p>You can close this tab and return to your terminal.</p>
+  </div>
+</body>
+</html>`;
+var ERROR_HTML = (msg) => `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><title>SvgForce CLI \u2014 Error</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0a0e1a; color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .card { text-align: center; padding: 48px; border-radius: 24px;
+      background: rgba(15, 20, 45, 0.8); border: 1px solid rgba(239,68,68,0.3); }
+    h1 { font-size: 24px; margin-bottom: 8px; color: #ef4444; }
+    p { color: rgba(255,255,255,0.5); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card"><h1>Authentication failed</h1><p>${msg}</p></div>
+</body>
+</html>`;
+function findFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = http.createServer();
+    srv.listen(0, "127.0.0.1", () => {
+      const addr = srv.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      srv.close(() => resolve(port));
+    });
+    srv.on("error", reject);
+  });
+}
+async function loginWithBrowser() {
+  const port = await findFreePort();
+  log.info(`Opening browser to authenticate with ${chalk5.bold("SvgForce")}...`);
+  log.dim("  If the browser does not open, visit the URL below manually:");
+  const authUrl = `${FRONTEND_URL}/en/cli-auth?port=${port}`;
+  log.dim(`  ${authUrl}`);
+  log.blank();
+  const spinner = ora("Waiting for browser authentication...").start();
+  const token = await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      server.close();
+      reject(new CliError(
+        "Login timed out (2 minutes). No response from browser.",
+        "Try again or use: svgforce login --api-key <key>"
+      ));
+    }, 12e4);
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
+      if (url.pathname === "/callback") {
+        const tk = url.searchParams.get("token");
+        const email = url.searchParams.get("email");
+        if (tk) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(SUCCESS_HTML);
+          clearTimeout(timeout);
+          server.close();
+          if (email) storeJwt(tk, email);
+          else storeJwt(tk);
+          resolve(tk);
+        } else {
+          res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(ERROR_HTML("No token received."));
+        }
+        return;
+      }
+      res.writeHead(404);
+      res.end("Not found");
+    });
+    server.listen(port, "127.0.0.1", () => {
+      open(authUrl).catch(() => {
+      });
+    });
+  });
+  spinner.stop();
+  try {
+    const baseUrl = getApiUrl().replace(/\/+$/, "");
+    const res = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "svgforce-cli/1.0.0"
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      log.success(`Authenticated as ${chalk5.bold(data.email ?? data.name ?? "user")}`);
+    } else {
+      log.success("Authenticated via browser.");
+    }
+  } catch {
+    log.success("Authenticated via browser.");
+  }
 }
 async function loginWithApiKey(key) {
   if (!key.startsWith("sf_live_")) {
@@ -857,9 +988,9 @@ function createCli() {
       handleError(err);
     }
   });
-  program2.command("login").description("Authenticate with SvgForce (interactive or API key)").option("--api-key <key>", "Use an API key instead of email/password").action(async (opts) => {
+  program2.command("login").description("Authenticate with SvgForce (opens browser by default)").option("--api-key <key>", "Use an API key (for CI/CD)").option("--with-email", "Use email + password instead of browser", false).action(async (opts) => {
     try {
-      await loginCommand({ apiKey: opts.apiKey });
+      await loginCommand({ apiKey: opts.apiKey, withEmail: opts.withEmail });
     } catch (err) {
       handleError(err);
     }
