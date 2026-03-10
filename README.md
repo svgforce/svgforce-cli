@@ -20,8 +20,7 @@ Optimize SVG files and generate production-ready icon components for:
 
 Directly from your terminal.
 
-> ⚠ CLI access is available on the **Team plan**.
-> See [pricing](https://svgforce.dev/subscription) for details.
+> ⚠ CLI access is included with the **Team plan**. See [pricing](https://svgforce.dev/subscription) for details.
 
 ## Why SvgForce CLI
 
@@ -39,6 +38,8 @@ Benefits:
 ```bash
 npm install -g svgforce
 ```
+
+Works with any project — React, React Native, Angular or plain SVG folders.
 
 Or run instantly without installing:
 
