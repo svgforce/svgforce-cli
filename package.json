@@ -1,6 +1,6 @@
 {
   "name": "svgforce",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SvgForce CLI — optimize SVGs and generate React/RN/Angular components from the terminal",
   "homepage": "https://svgforce.dev",
   "repository": {
@@ -28,13 +28,15 @@
   },
   "keywords": [
     "svg",
-    "react",
-    "react-native",
-    "angular",
-    "icon",
-    "component",
-    "optimize",
-    "cli"
+    "svg optimizer",
+    "svg icons",
+    "react icons",
+    "react-native icons",
+    "angular icons",
+    "icon generator",
+    "svg converter",
+    "svg cli",
+    "react svg"
   ],
   "license": "MIT",
   "dependencies": {
