@@ -790,12 +790,8 @@ async function resolveSvgFiles(patterns) {
 }
 function readSvgFile(filePath) {
   const svg = fs3.readFileSync(filePath, "utf-8");
-  const baseName = path3.basename(filePath, ".svg");
-  const name = toPascalCase(baseName);
+  const name = path3.basename(filePath, ".svg");
   return { name, svg, absolutePath: filePath };
-}
-function toPascalCase(str) {
-  return str.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join("");
 }
 function ensureOutputDir(dir) {
   if (!fs3.existsSync(dir)) {

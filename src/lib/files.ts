@@ -47,8 +47,7 @@ export async function resolveSvgFiles(patterns: string[]): Promise<SvgFile[]> {
 
 function readSvgFile(filePath: string): SvgFile {
   const svg = fs.readFileSync(filePath, 'utf-8');
-  const baseName = path.basename(filePath, '.svg');
-  const name = toPascalCase(baseName);
+  const name = path.basename(filePath, '.svg');
   return { name, svg, absolutePath: filePath };
 }
 
